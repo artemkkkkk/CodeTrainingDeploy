@@ -1,0 +1,226 @@
+asyncapi: 2.6.0
+info:
+  title: Code Testing Service Events
+  version: 1.0.0
+  description: |
+    Спецификация событий для системы тестирования кода.
+    
+    Поток данных:
+    1. Пользователь отправляет решение -> Очередь **solutions**.
+    2. Тестирующий сервис обрабатывает код -> Очередь **results**.
+    
+    Каждый тестовый кейс имеет уникальный `id` для точной идентификации результатов.
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  production:
+    url: rabbitmq.prod.example.com:5672
+    protocol: amqp
+    description: Production RabbitMQ Server
+  development:
+    url: localhost:5672
+    protocol: amqp
+    description: Local Development RabbitMQ
+
+defaultContentType: application/json
+
+channels:
+  solutions:
+    description: Очередь для получения новых решений от пользователей для запуска тестов.
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: code.testing.exchange
+          type: topic
+          durable: true
+        queue:
+          name: solutions
+          durable: true
+          exclusive: false
+          autoDelete: false
+    publish:
+      operationId: publishSolution
+      summary: Публикация нового решения задачи
+      description: Сервис-отправитель (Frontend/API) публикует сюда код решения.
+      message:
+        $ref: '#/components/messages/SolutionSubmitMessage'
+
+  results:
+    description: Очередь для получения результатов выполнения тестов.
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: code.testing.exchange
+          type: topic
+          durable: true
+        queue:
+          name: results
+          durable: true
+          exclusive: false
+          autoDelete: false
+    subscribe:
+      operationId: receiveTestResult
+      summary: Получение результата тестирования
+      description: Сервис уведомлений или API подписывается сюда, чтобы сообщить пользователю результат.
+      message:
+        $ref: '#/components/messages/TestResultMessage'
+
+components:
+  messages:
+    SolutionSubmitMessage:
+      name: SolutionSubmit
+      title: Решение задачи
+      contentType: application/json
+      schemaFormat: application/schema+json;version=draft-07
+      payload:
+        type: object
+        required:
+          - user_id
+          - task_id
+          - solution
+          - test_cases
+        properties:
+          user_id:
+            type: string
+            description: ID пользователя
+            example: "usr_1234567890"
+          task_id:
+            type: string
+            description: ID задачи
+            example: "tsk_leetcode_001"
+          solution:
+            type: string
+            description: Исходный код решения
+            example: "def solve(n):\n    return n * 2"
+          test_cases:
+            type: array
+            description: Массив тестовых кейсов
+            items:
+              type: object
+              required:
+                - id
+                - wanted_input
+                - wanted_output
+                - max_time_ms
+              properties:
+                id:
+                  type: integer
+                  description: Уникальный ID тестового кейса (для идентификации в ответе).
+                  example: 1
+                wanted_input:
+                  type: string
+                  description: Входные данные
+                  example: "5"
+                wanted_output:
+                  type: string
+                  description: Ожидаемые выходные данные
+                  example: "10"
+                max_time_ms:
+                  type: integer
+                  description: Максимальное время выполнения (мс)
+                  example: 1000
+      examples:
+        - name: Пример отправки
+          payload:
+            user_id: "usr_998877"
+            task_id: "tsk_sort_array"
+            solution: "print(sorted(input()))"
+            test_cases:
+              - id: 1
+                wanted_input: "3 1 2"
+                wanted_output: "1 2 3"
+                max_time_ms: 500
+              - id: 2
+                wanted_input: "z a b"
+                wanted_output: "a b z"
+                max_time_ms: 500
+
+    TestResultMessage:
+      name: TestResult
+      title: Результат тестирования
+      contentType: application/json
+      schemaFormat: application/schema+json;version=draft-07
+      payload:
+        type: object
+        required:
+          - user_id
+          - task_id
+          - status
+          - failed_testcases
+        properties:
+          user_id:
+            type: string
+            description: ID пользователя
+            example: "usr_1234567890"
+          task_id:
+            type: string
+            description: ID задачи
+            example: "tsk_leetcode_001"
+          status:
+            type: boolean
+            description: true если все тесты пройдены, false если есть ошибки
+            example: false
+          failed_testcases:
+            type: array
+            description: Список проваленных тестов
+            items:
+              type: object
+              required:
+                - id
+                - wanted_input
+                - wanted_output
+                - recieved_output
+                - max_time_ms
+                - recieved_time_ms
+              properties:
+                id:
+                  type: integer
+                  description: ID тестового кейса, который упал (соответствует ID из запроса).
+                  example: 2
+                wanted_input:
+                  type: string
+                  description: Входные данные теста
+                  example: "10 20"
+                wanted_output:
+                  type: string
+                  description: Ожидаемый результат
+                  example: "30"
+                recieved_output:
+                  type: string
+                  description: Фактический результат
+                  example: "25"
+                max_time_ms:
+                  type: integer
+                  description: Лимит времени (мс)
+                  example: 1000
+                recieved_time_ms:
+                  type: integer
+                  description: Фактическое время выполнения (мс)
+                  example: 1050
+      examples:
+        - name: Пример неудачи (Time Limit на тесте №2)
+          payload:
+            user_id: "usr_998877"
+            task_id: "tsk_sort_array"
+            status: false
+            failed_testcases:
+              - id: 2
+                wanted_input: "large_data..."
+                wanted_output: "sorted..."
+                recieved_output: ""
+                max_time_ms: 500
+                recieved_time_ms: 501
+        - name: Пример успеха
+          payload:
+            user_id: "usr_998877"
+            task_id: "tsk_simple_sum"
+            status: true
+            failed_testcases: []
+
+  securitySchemes:
+    userPassword:
+      type: userPassword

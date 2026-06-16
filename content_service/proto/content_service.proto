@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package content_service;
+
+message Task {
+  string name = 1;
+  string description = 2;
+  string difficult = 3;
+  int32 complete = 4;
+  int32 tried = 5;
+  repeated string tags = 6;
+}
+
+message LoadTasksRequest {
+  string token = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+  string difficult = 4;
+  repeated string tags = 5;
+}
+
+message LoadTasksResponse {
+  repeated Task tasks = 1;
+}
+
+message LoadProfileRequest {
+  string token = 1;
+}
+
+message LoadProfileResponse {
+  string name = 1;
+  string description = 2;
+  string avatar_url = 3;
+  int32 rating = 4;
+}
+
+message Comment {
+  string author_name = 1;
+  string text = 2;
+  string date = 3;
+}
+
+message LoadCommentsRequest {
+  string token = 1;
+  string task_name = 2;
+  int32 offset = 3;
+  int32 limit = 4;
+}
+
+message LoadCommentsResponse {
+  repeated Comment comments = 1;
+}
+
+service ContentService {
+  rpc LoadTasks (LoadTasksRequest) returns (LoadTasksResponse);
+  rpc LoadProfile (LoadProfileRequest) returns (LoadProfileResponse);
+  rpc LoadComments (LoadCommentsRequest) returns (LoadCommentsResponse);
+}

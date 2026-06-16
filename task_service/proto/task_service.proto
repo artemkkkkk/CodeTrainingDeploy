@@ -1,0 +1,36 @@
+syntax = "proto3";
+package task_service;
+
+message TestCase {
+  string wanted_input = 1;
+  string wanted_output = 2;
+  int32 max_time_ms = 3;
+}
+
+message CreateTaskRequest {
+  string token = 1;
+  string task_name = 2;
+  string description = 3;
+  string difficult = 4;
+  repeated string tags = 5; // array, hashmap, string, tree, recursion, sort, dynamic, two_pointers
+  repeated TestCase test_cases = 6;
+}
+
+message CreateTaskResponse {
+  string status = 1;
+}
+
+message SubmitSolutionRequest {
+  string token = 1;
+  string task_name = 2;
+  string code = 3;
+}
+
+message SubmitSolutionResponse {
+  string status = 1;
+}
+
+service TaskService {
+  rpc CreateTask (CreateTaskRequest) returns (CreateTaskResponse);
+  rpc SubmitSolution (SubmitSolutionRequest) returns (SubmitSolutionResponse);
+}

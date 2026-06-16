@@ -1,0 +1,325 @@
+openapi: 3.0.3
+info:
+  title: Code Training API gateway
+  description: API Gateway для платформы задач по программированию. Транслирует HTTP запросы в gRPC микросервисы.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Registration status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful with token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /tasks:
+    get:
+      tags:
+        - Content
+      summary: Get list of tasks
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: difficult
+          in: query
+          schema:
+            type: string
+            enum: [easy, medium, hard]
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadTasksResponse'
+
+    post:
+      tags:
+        - Task Management
+      summary: Create a new task (Admin/Moderator)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '200':
+          description: Task creation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+  /profile:
+    get:
+      tags:
+        - User Profile
+      summary: Get user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadProfileResponse'
+
+  /tasks/{task_name}/comments:
+    get:
+      tags:
+        - Content
+      summary: Get comments for a specific task
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadCommentsResponse'
+
+  /submissions:
+    post:
+      tags:
+        - Task Management
+      summary: Submit a solution for a task
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitSolutionRequest'
+      responses:
+        '200':
+          description: Submission status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT # Или просто токен, как в вашей системе
+
+  schemas:
+    # SSO Schemas
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+      required:
+        - name
+        - email
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+          format: password
+      required:
+        - name
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        token:
+          type: string
+
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+
+    # Content Schemas
+    Task:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        difficult:
+          type: string
+        complete:
+          type: integer
+        tried:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+
+    LoadTasksResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+
+    LoadProfileResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+        rating:
+          type: integer
+        easy_tasks:
+          type: integer
+        medium_tasks:
+          type: integer
+        hard_tasks:
+          type: integer
+
+    Comment:
+      type: object
+      properties:
+        author_name:
+          type: string
+        text:
+          type: string
+        date:
+          type: string
+          format: date-time # ISO 8601
+
+    LoadCommentsResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+
+    # Task Service Schemas
+    TestCase:
+      type: object
+      properties:
+        wanted_input:
+          type: string
+        wanted_output:
+          type: string
+        max_time_ms:
+          type: integer
+
+    CreateTaskRequest:
+      type: object
+      properties:
+        task_name:
+          type: string
+        description:
+          type: string
+        test_cases:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestCase'
+      required:
+        - task_name
+        - description
+        - test_cases
+
+    SubmitSolutionRequest:
+      type: object
+      properties:
+        task_name:
+          type: string
+        code:
+          type: string
+      required:
+        - task_name
+        - code
